@@ -7,10 +7,12 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import fr.albanw.lib.TokenUtils;
 import fr.miage.orleans.tokens.facades.Facade;
 import fr.miage.orleans.tokens.facades.Personne;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
@@ -45,6 +47,11 @@ import java.util.stream.Collectors;
 
 public class SecurityConfig {
 
+    private TokenUtils tokenUtils;
+    SecurityConfig(JWK jwk) {
+        this.tokenUtils = new TokenUtils(jwk);
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(CsrfConfigurer::disable)
@@ -57,7 +64,7 @@ public class SecurityConfig {
                 )
 
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(token -> tokenUtils.validateToken(token))))
                 .exceptionHandling((exceptions) -> exceptions
                         .authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
                         .accessDeniedHandler(new BearerTokenAccessDeniedHandler()));
@@ -77,11 +84,6 @@ public class SecurityConfig {
         NimbusJwtEncoder nimbusJwtEncoder = new NimbusJwtEncoder(jwkSource);
 
         return nimbusJwtEncoder;
-    }
-
-    @Bean
-    public JwtDecoder jwtDecoder(JWK jwk) {
-        return NimbusJwtDecoder.withSecretKey(jwk.toOctetSequenceKey().toSecretKey()).build();
     }
 
 
